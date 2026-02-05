@@ -228,7 +228,7 @@ class ResNet(nn.Module):
             if isinstance(layer, nn.BatchNorm2d):
                 layer.eval()
 
-    def forward(self, inputs):
+    def forward(self, inputs, return_raw = True):
 
         if self.training:
             img_batch, annotations = inputs
@@ -253,9 +253,13 @@ class ResNet(nn.Module):
 
         anchors = self.anchors(img_batch)
 
+
         if self.training:
             return self.focalLoss(classification, regression, anchors, annotations)
         else:
+
+            if (return_raw):
+                return [classification, regression, anchors]
             transformed_anchors = self.regressBoxes(anchors, regression)
             transformed_anchors = self.clipBoxes(transformed_anchors, img_batch)
 
