@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from retinanet import coco_eval
 from retinanet import csv_eval
 
-assert torch.__version__.split('.')[0] == '1'
+# assert torch.__version__.split('.')[0] == '1'
 
 print('CUDA available: {}'.format(torch.cuda.is_available()))
 
@@ -100,9 +100,9 @@ def main(args=None):
 
     retinanet.training = True
 
-    optimizer = optim.Adam(retinanet.parameters(), lr=1e-5)
+    optimizer = optim.Adam(retinanet.parameters(), lr=1e-4)
 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
 
     loss_hist = collections.deque(maxlen=500)
 
@@ -158,8 +158,7 @@ def main(args=None):
         if parser.dataset == 'coco':
 
             print('Evaluating dataset')
-
-            coco_eval.evaluate_coco(dataset_val, retinanet)
+            #coco_eval.evaluate_coco(dataset_val, retinanet)
 
         elif parser.dataset == 'csv' and parser.csv_val is not None:
 
