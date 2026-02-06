@@ -234,7 +234,7 @@ class ResNet(nn.Module):
             img_batch, annotations = inputs
         else:
             img_batch = inputs
-
+        print("DEBUG: ", img_batch.shape)
         x = self.conv1(img_batch)
         x = self.bn1(x)
         x = self.relu(x)
