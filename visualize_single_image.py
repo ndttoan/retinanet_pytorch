@@ -5,6 +5,7 @@ import os
 import csv
 import cv2
 import argparse
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def load_classes(csv_reader):
@@ -41,7 +42,15 @@ def detect_image(image_path, model_path, class_list):
     for key, value in classes.items():
         labels[value] = key
 
-    model = torch.load(model_path)
+    model = torch.load(
+        model_path,
+        weights_only=False,
+        map_location=torch.device("cpu")
+    )
+
+
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -54,7 +63,9 @@ def detect_image(image_path, model_path, class_list):
         image = cv2.imread(os.path.join(image_path, img_name))
         if image is None:
             continue
+        #image_orig = cv2.resize(image.copy(), (224, 224))
         image_orig = image.copy()
+
 
         rows, cols, cns = image.shape
 
@@ -82,6 +93,14 @@ def detect_image(image_path, model_path, class_list):
         new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
         new_image[:rows, :cols, :] = image.astype(np.float32)
         image = new_image.astype(np.float32)
+
+
+         # FORCE FIXED INPUT SIZE
+        # image = cv2.resize(image, (224, 224))
+        # image = image.astype(np.float32)
+        # scale = 1.0
+   
+
         image /= 255
         image -= [0.485, 0.456, 0.406]
         image /= [0.229, 0.224, 0.225]
@@ -96,10 +115,14 @@ def detect_image(image_path, model_path, class_list):
 
             st = time.time()
             print(image.shape, image_orig.shape, scale)
-            scores, classification, transformed_anchors = model(image.cuda().float())
+
+            image = image.to(device)
+            print(image)
+            scores, classification, transformed_anchors = model(image.float())
+
             print('Elapsed time: {}'.format(time.time() - st))
             idxs = np.where(scores.cpu() > 0.5)
-
+            
             for j in range(idxs[0].shape[0]):
                 bbox = transformed_anchors[idxs[0][j], :]
 

@@ -298,43 +298,63 @@ class CSVDataset(Dataset):
         return float(image.width) / float(image.height)
 
 
-def collater(data):
+# def collater(data):
 
-    imgs = [s['img'] for s in data]
-    annots = [s['annot'] for s in data]
-    scales = [s['scale'] for s in data]
+#     imgs = [s['img'] for s in data]
+#     annots = [s['annot'] for s in data]
+#     scales = [s['scale'] for s in data]
         
-    widths = [int(s.shape[0]) for s in imgs]
-    heights = [int(s.shape[1]) for s in imgs]
-    batch_size = len(imgs)
+#     widths = [int(s.shape[0]) for s in imgs]
+#     heights = [int(s.shape[1]) for s in imgs]
+#     batch_size = len(imgs)
 
-    max_width = np.array(widths).max()
-    max_height = np.array(heights).max()
+#     max_width = np.array(widths).max()
+#     max_height = np.array(heights).max()
 
-    padded_imgs = torch.zeros(batch_size, max_width, max_height, 3)
+#     padded_imgs = torch.zeros(batch_size, max_width, max_height, 3)
 
-    for i in range(batch_size):
-        img = imgs[i]
-        padded_imgs[i, :int(img.shape[0]), :int(img.shape[1]), :] = img
+#     for i in range(batch_size):
+#         img = imgs[i]
+#         padded_imgs[i, :int(img.shape[0]), :int(img.shape[1]), :] = img
 
-    max_num_annots = max(annot.shape[0] for annot in annots)
+#     max_num_annots = max(annot.shape[0] for annot in annots)
     
+#     if max_num_annots > 0:
+
+#         annot_padded = torch.ones((len(annots), max_num_annots, 5)) * -1
+
+#         if max_num_annots > 0:
+#             for idx, annot in enumerate(annots):
+#                 #print(annot.shape)
+#                 if annot.shape[0] > 0:
+#                     annot_padded[idx, :annot.shape[0], :] = annot
+#     else:
+#         annot_padded = torch.ones((len(annots), 1, 5)) * -1
+
+
+#     padded_imgs = padded_imgs.permute(0, 3, 1, 2)
+
+#     return {'img': padded_imgs, 'annot': annot_padded, 'scale': scales}
+
+
+def collater(data):
+    imgs = torch.stack([s['img'] for s in data], dim=0)
+    annots = [s['annot'] for s in data]
+
+    max_num_annots = max(a.shape[0] for a in annots)
+
     if max_num_annots > 0:
-
         annot_padded = torch.ones((len(annots), max_num_annots, 5)) * -1
-
-        if max_num_annots > 0:
-            for idx, annot in enumerate(annots):
-                #print(annot.shape)
-                if annot.shape[0] > 0:
-                    annot_padded[idx, :annot.shape[0], :] = annot
+        for i, a in enumerate(annots):
+            if a.shape[0] > 0:
+                annot_padded[i, :a.shape[0]] = a
     else:
         annot_padded = torch.ones((len(annots), 1, 5)) * -1
 
-
-    padded_imgs = padded_imgs.permute(0, 3, 1, 2)
-
-    return {'img': padded_imgs, 'annot': annot_padded, 'scale': scales}
+    return {
+        'img': imgs.permute(0, 3, 1, 2),  # NCHW
+        'annot': annot_padded
+    }
 
 class Resizer(object):
     """Convert ndarrays in sample to Tensors."""
@@ -369,6 +389,35 @@ class Resizer(object):
         annots[:, :4] *= scale
 
         return {'img': torch.from_numpy(new_image), 'annot': torch.from_numpy(annots), 'scale': scale}
+
+class ResizerFixed224(object):
+    def __call__(self, sample):
+        image, annots = sample['img'], sample['annot']
+
+        rows, cols, cns = image.shape
+
+        target_size = 224
+
+        scale_x = target_size / cols
+        scale_y = target_size / rows
+
+        image = skimage.transform.resize(
+            image,
+            (target_size, target_size),
+            preserve_range=True
+        ).astype(np.float32)
+
+        annots = annots.copy()
+        annots[:, 0] *= scale_x
+        annots[:, 2] *= scale_x
+        annots[:, 1] *= scale_y
+        annots[:, 3] *= scale_y
+
+        return {
+            'img': torch.from_numpy(image),
+            'annot': torch.from_numpy(annots),
+            'scale': (scale_x, scale_y)
+        }
 
 
 class Augmenter(object):
